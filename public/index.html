@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RANGER BPR Bot</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #ffffff;
+      --bg-secondary: #f8f9fa;
+      --text: #1a1a2e;
+      --text-secondary: #6c757d;
+      --red: #dc2626;
+      --red-light: #fef2f2;
+      --blue: #2563eb;
+      --blue-light: #eff6ff;
+      --border: #e5e7eb;
+      --success: #16a34a;
+      --warning: #ca8a04;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .app { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 320px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      padding: 20px;
+      overflow-y: auto;
+      position: fixed;
+      height: 100vh;
+      z-index: 10;
+    }
+    .main {
+      margin-left: 320px;
+      flex: 1;
+      padding: 24px;
+      max-width: calc(100vw - 320px);
+    }
+    h1 { font-size: 22px; font-weight: 700; color: var(--blue); margin-bottom: 4px; }
+    .subtitle { font-size: 12px; color: var(--text-secondary); margin-bottom: 20px; }
+    .section { margin-bottom: 20px; }
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .form-group { margin-bottom: 12px; }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: var(--text);
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--text);
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px var(--blue-light);
+    }
+    .input-row { display: flex; gap: 8px; }
+    .input-row input { flex: 1; }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: var(--blue);
+      color: white;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-danger {
+      background: var(--red);
+      color: white;
+    }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .status-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .status-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      min-width: 140px;
+    }
+    .status-card .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    .status-card .value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .status-card .value.win { color: var(--success); }
+    .status-card .value.loss { color: var(--red); }
+    .status-card .value.pending { color: var(--warning); }
+    .status-card .value.blue { color: var(--blue); }
+    
+    .setups-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .setup-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      background: var(--bg);
+      transition: box-shadow 0.2s;
+    }
+    .setup-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .setup-card.winning { border-left: 4px solid var(--success); }
+    .setup-card.losing { border-left: 4px solid var(--red); }
+    .setup-card.pending { border-left: 4px solid var(--warning); }
+    .setup-card.resolved-win { background: #f0fdf4; border-color: #86efac; }
+    .setup-card.resolved-loss { background: var(--red-light); border-color: #fca5a5; }
+    
+    .setup-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .setup-pair {
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .setup-direction {
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .setup-direction.long { background: var(--blue-light); color: var(--blue); }
+    .setup-direction.short { background: var(--red-light); color: var(--red); }
+    
+    .setup-status {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+    .setup-status.pending { background: #fef3c7; color: #92400e; }
+    .setup-status.winning { background: #dcfce7; color: #166534; }
+    .setup-status.losing { background: #fee2e2; color: #991b1b; }
+    .setup-status.win { background: #dcfce7; color: #166534; }
+    .setup-status.loss { background: #fee2e2; color: #991b1b; }
+    
+    .price-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .price-item .label { font-size: 10px; color: var(--text-secondary); }
+    .price-item .value { font-size: 13px; font-weight: 600; font-family: monospace; }
+    .price-item.entry { color: var(--blue); }
+    .price-item.sl { color: var(--red); }
+    .price-item.tp { color: var(--success); }
+    
+    .setup-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    
+    .api-status {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      z-index: 100;
+    }
+    .api-status.ok { background: #dcfce7; color: #166534; }
+    .api-status.warn { background: #fef3c7; color: #92400e; }
+    .api-status.error { background: var(--red-light); color: var(--red); }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-secondary);
+    }
+    .empty-state svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.3; }
+    
+    .filter-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .filter-tab {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .filter-tab.active {
+      background: var(--blue);
+      color: white;
+      border-color: var(--blue);
+    }
+    
+    .math-box {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 11px;
+      font-family: monospace;
+      margin-top: 8px;
+      color: var(--text-secondary);
+    }
+    
+    @media (max-width: 768px) {
+      .sidebar { width: 100%; position: relative; height: auto; }
+      .main { margin-left: 0; max-width: 100%; }
+      .app { flex-direction: column; }
+    }
+  </style>
+<base target="_blank">
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+    
+    function App() {
+      const [data, setData] = useState(null);
+      const [settings, setSettings] = useState(null);
+      const [ws, setWs] = useState(null);
+      const [filter, setFilter] = useState('ALL');
+      const [editingSettings, setEditingSettings] = useState({});
+      const [apiKey, setApiKey] = useState('');
+      
+      // Fetch initial data
+      const fetchData = useCallback(async () => {
+        try {
+          const [statusRes, settingsRes] = await Promise.all([
+            fetch('/api/status'),
+            fetch('/api/settings')
+          ]);
+          const status = await statusRes.json();
+          const sett = await settingsRes.json();
+          setData(status);
+          setSettings(sett);
+          setEditingSettings(sett);
+        } catch (e) {
+          console.error('Fetch error:', e);
+        }
+      }, []);
+      
+      useEffect(() => {
+        fetchData();
+        const interval = setInterval(fetchData, 10000); // Fallback polling
+        
+        // WebSocket for real-time updates
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}`;
+        const socket = new WebSocket(wsUrl);
+        
+        socket.onopen = () => console.log('WS connected');
+        socket.onmessage = (e) => {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'pollComplete' || msg.type === 'settingsUpdated') {
+            fetchData();
+          }
+        };
+        socket.onerror = (e) => console.log('WS error:', e);
+        setWs(socket);
+        
+        return () => {
+          clearInterval(interval);
+          socket.close();
+        };
+      }, [fetchData]);
+      
+      const handleSaveSettings = async () => {
+        try {
+          const res = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...editingSettings, twelveDataKey: apiKey || undefined })
+          });
+          const result = await res.json();
+          if (result.success) {
+            setSettings(result.settings);
+            alert('Settings saved!');
+          }
+        } catch (e) {
+          alert('Save failed: ' + e.message);
+        }
+      };
+      
+      const handleControl = async (action) => {
+        try {
+          const res = await fetch('/api/control', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action })
+          });
+          const result = await res.json();
+          if (result.error) {
+            alert(result.error);
+          } else {
+            fetchData();
+          }
+        } catch (e) {
+          alert('Control failed: ' + e.message);
+        }
+      };
+      
+      const handleDeleteSetup = async (id) => {
+        if (!confirm('Delete this setup?')) return;
+        await fetch(`/api/setups/${id}`, { method: 'DELETE' });
+        fetchData();
+      };
+      
+      const filteredSetups = data?.setups?.filter(s => {
+        if (filter === 'ALL') return true;
+        if (filter === 'PENDING') return s.status === 'PENDING';
+        if (filter === 'RESOLVED') return s.status === 'WIN' || s.status === 'LOSS';
+        if (filter === 'WINNING') return s.currentStatus === 'WINNING';
+        return true;
+      }) || [];
+      
+      const apiHealth = data ? 
+        data.apiCallsThisMinute >= 7 ? 'error' :
+        data.apiCallsThisMinute >= 5 ? 'warn' : 'ok'
+        : 'ok';
+      
+      // Calculate rate limit math
+      const pairsCount = settings?.pairs?.length || 1;
+      const requestsPerDay = pairsCount * Math.floor(60 / (settings?.pollIntervalMinutes || 15)) * 24;
+      const dailyUtilization = ((requestsPerDay / 800) * 100).toFixed(1);
+      
+      return (
+        <div className="app">
+          <div className="api-status" className={`api-status ${apiHealth}`}>
+            API: {data?.apiCallsThisMinute || 0}/min | {data?.apiCallsToday || 0}/day
+          </div>
+          
+          <aside className="sidebar">
+            <h1>🔴 RANGER BPR</h1>
+            <p className="subtitle">Balanced Price Range Signal Bot</p>
+            
+            <div className="section">
+              <div className="section-title">Control</div>
+              <button 
+                className={`btn ${data?.isRunning ? 'btn-danger' : 'btn-primary'}`}
+                onClick={() => handleControl(data?.isRunning ? 'stop' : 'start')}
+              >
+                {data?.isRunning ? '⏹ Stop Bot' : '▶ Start Bot'}
+              </button>
+              {data?.isRunning && (
+                <p style={{fontSize: 11, color: 'var(--text-secondary)', marginTop: 8}}>
+                  Next poll: {data?.nextPoll ? new Date(data.nextPoll).toLocaleTimeString() : '...'}
+                </p>
+              )}
+            </div>
+            
+            <div className="section">
+              <div className="section-title">API Key</div>
+              <input 
+                type="password" 
+                placeholder="Twelve Data API Key" 
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+              />
+            </div>
+            
+            <div className="section">
+              <div className="section-title">Pairs & Polling</div>
+              <div className="form-group">
+                <label>Pairs (comma-separated)</label>
+                <textarea 
+                  rows="3"
+                  value={(editingSettings.pairs || []).join(', ')}
+                  onChange={e => setEditingSettings({...editingSettings, pairs: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Poll Interval (minutes)</label>
+                <input 
+                  type="number" 
+                  min="2" 
+                  value={editingSettings.pollIntervalMinutes || 15}
+                  onChange={e => setEditingSettings({...editingSettings, pollIntervalMinutes: parseInt(e.target.value)})}
+                />
+                <div className="math-box">
+                  {pairsCount} pairs × {Math.floor(60/(editingSettings.pollIntervalMinutes||15))}/hr × 24 = {requestsPerDay}/day<br/>
+                  Limit: 800/day ({dailyUtilization}% utilized)<br/>
+                  Min safe: {Math.ceil(pairsCount * 24 * 60 / 800)}min
+                </div>
+              </div>
+            </div>
+            
+            <div className="section">
+              <div className="section-title">Strategy Thresholds</div>
+              <div className="input-row">
+                <div className="form-group">
+                  <label>Swing LB</label>
+                  <input type="number" value={editingSettings.swingLookback || 5} onChange={e => setEditingSettings({...editingSettings, swingLookback: parseInt(e.target.value)})} />
+                </div>
+                <div className="form-group">
+                  <label>Max Age</label>
+                  <input type="number" value={editingSettings.maxSwingAge || 50} onChange={e => setEditingSettings({...editingSettings, maxSwingAge: parseInt(e.target.value)})} />
+                </div>
+              </div>
+              <div className="input-row">
+                <div className="form-group">
+                  <label>Min Sweep</label>
+                  <input type="number" step="0.5" value={editingSettings.minSweepPips || 2} onChange={e => setEditingSettings({...editingSettings, minSweepPips: parseFloat(e.target.value)})} />
+                </div>
+                <div className="form-group">
+                  <label>Disrespect</label>
+                  <input type="number" step="0.5" value={editingSettings.minDisrespectPips || 1} onChange={e => setEditingSettings({...editingSettings, minDisrespectPips: parseFloat(e.target.value)})} />
+                </div>
+              </div>
+              <div className="input-row">
+                <div className="form-group">
+                  <label>Max Risk</label>
+                  <input type="number" value={editingSettings.maxPipRisk || 50} onChange={e => setEditingSettings({...editingSettings, maxPipRisk: parseFloat(e.target.value)})} />
+                </div>
+                <div className="form-group">
+                  <label>Min Risk</label>
+                  <input type="number" value={editingSettings.minPipRisk || 3} onChange={e => setEditingSettings({...editingSettings, minPipRisk: parseFloat(e.target.value)})} />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>R:R Ratio</label>
+                <input type="number" step="0.5" value={editingSettings.riskReward || 3} onChange={e => setEditingSettings({...editingSettings, riskReward: parseFloat(e.target.value)})} />
+              </div>
+            </div>
+            
+            <button className="btn btn-primary" onClick={handleSaveSettings}>
+              💾 Save Settings
+            </button>
+          </aside>
+          
+          <main className="main">
+            <div className="status-bar">
+              <div className="status-card">
+                <div className="label">Total Setups</div>
+                <div className="value blue">{data?.stats?.totalSetups || 0}</div>
+              </div>
+              <div className="status-card">
+                <div className="label">Win Rate</div>
+                <div className={`value ${parseFloat(data?.stats?.winRate) > 30 ? 'win' : 'loss'}`}>
+                  {data?.stats?.winRate || '0.0'}%
+                </div>
+              </div>
+              <div className="status-card">
+                <div className="label">Net Pips</div>
+                <div className={`value ${parseFloat(data?.stats?.totalPips) >= 0 ? 'win' : 'loss'}`}>
+                  {data?.stats?.totalPips > 0 ? '+' : ''}{data?.stats?.totalPips || '0.0'}
+                </div>
+              </div>
+              <div className="status-card">
+                <div className="label">Pending</div>
+                <div className="value pending">{data?.stats?.pending || 0}</div>
+              </div>
+              <div className="status-card">
+                <div className="label">In Play</div>
+                <div className="value">
+                  <span style={{color: 'var(--success)'}}>{data?.stats?.winningNow || 0}</span>
+                  <span style={{color: 'var(--text-secondary)'}}> / </span>
+                  <span style={{color: 'var(--red)'}}>{data?.stats?.losingNow || 0}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="filter-tabs">
+              {['ALL', 'PENDING', 'WINNING', 'RESOLVED'].map(f => (
+                <button 
+                  key={f}
+                  className={`filter-tab ${filter === f ? 'active' : ''}`}
+                  onClick={() => setFilter(f)}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+            
+            {filteredSetups.length === 0 ? (
+              <div className="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                </svg>
+                <p>No setups match your filter</p>
+                <p style={{fontSize: 12, marginTop: 8}}>
+                  {data?.isRunning 
+                    ? 'BPR setups are rare (~1 per 40 hours). Be patient.' 
+                    : 'Start the bot to begin scanning.'}
+                </p>
+              </div>
+            ) : (
+              <div className="setups-grid">
+                {filteredSetups.map(setup => (
+                  <SetupCard 
+                    key={setup.id} 
+                    setup={setup} 
+                    latestPrice={data?.latestPrices?.[setup.pair]}
+                    onDelete={() => handleDeleteSetup(setup.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </main>
+        </div>
+      );
+    }
+    
+    function SetupCard({ setup, latestPrice, onDelete }) {
+      const currentPnl = setup.direction === 'LONG' 
+        ? ((latestPrice || setup.entryPrice) - setup.entryPrice) * 10000
+        : (setup.entryPrice - (latestPrice || setup.entryPrice)) * 10000;
+      
+      const isWinning = currentPnl > 0;
+      const isLosing = currentPnl < 0;
+      
+      let cardClass = 'setup-card ';
+      if (setup.status === 'WIN') cardClass += 'resolved-win';
+      else if (setup.status === 'LOSS') cardClass += 'resolved-loss';
+      else if (setup.currentStatus === 'WINNING') cardClass += 'winning';
+      else if (setup.currentStatus === 'LOSING') cardClass += 'losing';
+      else cardClass += 'pending';
+      
+      return (
+        <div className={cardClass}>
+          <div className="setup-header">
+            <div>
+              <span className="setup-pair">{setup.pair}</span>
+              <span className={`setup-direction ${setup.direction.toLowerCase()}`} style={{marginLeft: 8}}>
+                {setup.direction}
+              </span>
+            </div>
+            <div>
+              <span className={`setup-status ${setup.status === 'PENDING' ? setup.currentStatus?.toLowerCase() : setup.status.toLowerCase()}`}>
+                {setup.status === 'PENDING' ? setup.currentStatus || 'PENDING' : setup.status}
+              </span>
+              <button 
+                onClick={onDelete}
+                style={{
+                  marginLeft: 8,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                  fontSize: 16
+                }}
+              >×</button>
+            </div>
+           </div>
+          <div className="price-grid">
+            <div className="price-item entry">
+              <div className="label">Entry</div>
+              <div className="value">{setup.entryPrice.toFixed(5)}</div>
+            </div>
+            <div className="price-item sl">
+              <div className="label">Stop</div>
+              <div className="value">{setup.stopLoss.toFixed(5)}</div>
+            </div>
+            <div className="price-item tp">
+              <div className="label">Target</div>
+              <div className="value">{setup.takeProfit.toFixed(5)}</div>
+            </div>
+          </div>
+          
+          {setup.status === 'PENDING' && (
+            <div style={{fontSize: 12, marginBottom: 8}}>
+              Current P&L: 
+              <span style={{
+                color: isWinning ? 'var(--success)' : isLosing ? 'var(--red)' : 'var(--text-secondary)',
+                fontWeight: 600,
+                marginLeft: 4
+              }}>
+                {currentPnl > 0 ? '+' : ''}{currentPnl.toFixed(1)} pips
+              </span>
+              {latestPrice && <span style={{color: 'var(--text-secondary)', marginLeft: 4}}>(@{latestPrice.toFixed(5)})</span>}
+            </div>
+          )}
+          
+          {setup.outcome && (
+            <div style={{fontSize: 13, fontWeight: 600, color: setup.status === 'WIN' ? 'var(--success)' : 'var(--red)'}}>
+              Result: {setup.outcome}
+            </div>
+          )}
+          <div className="setup-meta">
+            <span>Risk: {setup.riskPips} pips | R:R 1:{setup.rr}</span>
+            <span>{new Date(setup.detectedAt).toLocaleDateString()}</span>
+          </div>
+          {setup.maxFavorablePips !== 0 && (
+            <div style={{fontSize: 10, color: 'var(--text-secondary)', marginTop: 4}}>
+              MFE: +{setup.maxFavorablePips.toFixed(1)} | MAE: {setup.maxAdversePips.toFixed(1)}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
