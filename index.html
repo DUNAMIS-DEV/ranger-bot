@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>RANGER Signal Bot</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<style>
+  :root {
+    --white: #ffffff; --red: #e11d2e; --red-dark: #b3121f; --blue: #1d4ed8;
+    --blue-light: #eff4ff; --gray-bg: #f7f7f8; --gray-border: #e5e5e8;
+    --text-dark: #1a1a1a; --text-mid: #5a5a5f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--gray-bg); color: var(--text-dark); }
+  .app-shell { display: flex; min-height: 100vh; }
+  .main-area { flex: 1; padding: 20px 24px; max-width: 1100px; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .header h1 { font-size: 20px; font-weight: 700; margin: 0; }
+  .header h1 span { color: var(--red); }
+  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--blue-light); color: var(--blue); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
+  .status-pill.live { background: #fee2e4; color: var(--red); }
+  .status-pill.live .status-dot { background: var(--red); }
+  .ratelimit-badge { font-size: 11px; font-weight: 600; padding: 5px 10px; border-radius: 999px; background: #fef3c7; color: #92400e; }
+  .stats-bar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 16px; }
+  .stat-card { background: white; border: 1px solid var(--gray-border); border-radius: 10px; padding: 10px 12px; border-top: 3px solid var(--blue); }
+  .stat-card.accent-red { border-top-color: var(--red); }
+  .stat-card.accent-green { border-top-color: #16a34a; }
+  .stat-label { font-size: 10px; color: var(--text-mid); font-weight: 600; text-transform: uppercase; }
+  .stat-value { font-size: 20px; font-weight: 800; margin-top: 3px; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  select, button, input { font-family: inherit; font-size: 13px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--gray-border); background: white; color: var(--text-dark); }
+  button { cursor: pointer; font-weight: 600; }
+  button.primary { background: var(--red); color: white; border-color: var(--red); }
+  button.primary:hover { background: var(--red-dark); }
+  button.secondary { background: white; color: var(--blue); border-color: var(--blue); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .filter-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-tab { padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--gray-border); background: white; color: var(--text-mid); }
+  .filter-tab.active { background: var(--blue); color: white; border-color: var(--blue); }
+  .setup-list { display: flex; flex-direction: column; gap: 10px; }
+  .setup-card { background: white; border: 1px solid var(--gray-border); border-left: 4px solid var(--blue); border-radius: 10px; padding: 14px 16px; }
+  .setup-card.win { border-left-color: #16a34a; }
+  .setup-card.loss { border-left-color: var(--red); }
+  .setup-card.winning { border-left-color: #16a34a; }
+  .setup-card.losing { border-left-color: var(--red); }
+  .setup-top-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .symbol-name { font-weight: 700; font-size: 15px; }
+  .direction-badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+  .direction-badge.buy { background: #dcfce7; color: #15803d; }
+  .direction-badge.sell { background: #fee2e4; color: var(--red-dark); }
+  .outcome-badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; margin-left: auto; }
+  .outcome-badge.win { background: #dcfce7; color: #15803d; }
+  .outcome-badge.loss { background: #fee2e4; color: var(--red-dark); }
+  .outcome-badge.winning { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+  .outcome-badge.losing { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+  .outcome-badge.pending { background: #f3f4f6; color: var(--text-mid); }
+  .setup-prices { display: flex; gap: 16px; font-size: 13px; margin: 8px 0 4px; flex-wrap: wrap; }
+  .price-item .label { color: var(--text-mid); margin-right: 4px; }
+  .price-item .value { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pnl-row { font-size: 13px; margin-bottom: 6px; }
+  .pnl-row .pnl-value.positive { color: #16a34a; font-weight: 700; }
+  .pnl-row .pnl-value.negative { color: var(--red); font-weight: 700; }
+  .setup-reason { font-size: 12px; color: var(--text-mid); }
+  .setup-meta { display: flex; justify-content: space-between; margin-top: 8px; }
+  .setup-time { font-size: 11px; color: #9a9a9f; }
+  .delete-btn { background: none; border: none; color: #9a9a9f; cursor: pointer; font-size: 14px; padding: 2px 6px; }
+  .delete-btn:hover { color: var(--red); }
+  .empty-state { text-align: center; padding: 50px 20px; color: var(--text-mid); }
+  .sidebar { width: 320px; background: white; border-left: 1px solid var(--gray-border); padding: 20px; overflow-y: auto; max-height: 100vh; position: sticky; top: 0; }
+  .sidebar h2 { font-size: 15px; margin: 0 0 14px 0; }
+  .settings-section { border: 1px solid var(--gray-border); border-radius: 10px; margin-bottom: 12px; padding: 14px; }
+  .field-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .field-row label { font-size: 12px; color: var(--text-mid); font-weight: 600; }
+  .field-row input { font-size: 13px; padding: 6px 10px; }
+  .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .toggle-row label { font-size: 12px; font-weight: 600; color: var(--text-mid); }
+  .toggle-switch { position: relative; width: 38px; height: 21px; flex-shrink: 0; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #d1d5db; border-radius: 999px; transition: 0.2s; }
+  .toggle-slider:before { position: absolute; content: ""; height: 15px; width: 15px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s; }
+  input:checked + .toggle-slider { background: var(--red); }
+  input:checked + .toggle-slider:before { transform: translateX(17px); }
+  .pair-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pair-tag { font-size: 11px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--gray-border); cursor: pointer; background: white; color: var(--text-mid); }
+  .pair-tag.active { background: var(--blue-light); border-color: var(--blue); color: var(--blue); font-weight: 700; }
+  .save-hint { font-size: 11px; color: #16a34a; font-weight: 600; height: 14px; margin-top: 4px; }
+  .auto-adjust-note { font-size: 11px; color: #92400e; background: #fef3c7; padding: 6px 8px; border-radius: 6px; margin-top: 6px; }
+  .edit-link { background: none; border: none; color: var(--blue); font-size: 12px; font-weight: 600; padding: 2px 8px; cursor: pointer; }
+  .setup-edit-row { display: flex; gap: 10px; align-items: flex-end; margin: 8px 0; flex-wrap: wrap; }
+  .setup-edit-row .field-row { min-width: 90px; }
+  .edit-actions { display: flex; gap: 6px; }
+  .edit-actions button { padding: 6px 12px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+const API_BASE = '/api';
+const ALL_PAIRS = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'NZD/USD', 'GBP/JPY'];
+
+function fmtNum(n, symbol) {
+  if (typeof n !== 'number') return n;
+  const decimals = symbol && symbol.includes('JPY') ? 3 : 5;
+  return n.toFixed(decimals);
+}
+function pipMultiplier(symbol) { return symbol.includes('JPY') ? 100 : 10000; }
+function timeAgo(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function ToggleSwitch({ checked, onChange }) {
+  return (
+    <label className="toggle-switch">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span className="toggle-slider"></span>
+    </label>
+  );
+}
+
+function OutcomeBadge({ outcome }) {
+  const map = { win: '✓ WIN', loss: '✕ LOSS', winning: '▲ Winning', losing: '▼ Losing', pending: '⏳ Pending' };
+  return <span className={`outcome-badge ${outcome}`}>{map[outcome] || outcome}</span>;
+}
+
+function SetupCard({ setup, onEdit, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [slInput, setSlInput] = useState(setup.stopLoss);
+  const [tpInput, setTpInput] = useState(setup.takeProfit);
+  const [entryInput, setEntryInput] = useState(setup.entry);
+  const [saving, setSaving] = useState(false);
+  const isFinal = setup.outcome === 'win' || setup.outcome === 'loss';
+  const cardClass = ['win', 'loss', 'winning', 'losing'].includes(setup.outcome) ? setup.outcome : '';
+
+  const riskPips = Math.abs(setup.entry - setup.stopLoss) * pipMultiplier(setup.symbol);
+  const rewardPips = Math.abs(setup.takeProfit - setup.entry) * pipMultiplier(setup.symbol);
+
+  const handleSave = async () => {
+    const sl = Number(slInput), tp = Number(tpInput), en = Number(entryInput);
+    if (Number.isNaN(sl) || Number.isNaN(tp) || Number.isNaN(en) || slInput === '' || tpInput === '' || entryInput === '') {
+      alert('Entry, SL, and TP must all be valid numbers.');
+      return;
+    }
+    setSaving(true);
+    await onEdit(setup.id, { stopLoss: sl, takeProfit: tp, entry: en });
+    setSaving(false);
+    setEditing(false);
+  };
+
+  return (
+    <div className={`setup-card ${cardClass}`}>
+      <div className="setup-top-row">
+        <span className="symbol-name">{setup.symbol}</span>
+        <span className={`direction-badge ${setup.direction}`}>{setup.direction === 'buy' ? '▲ BUY' : '▼ SELL'}</span>
+        <OutcomeBadge outcome={setup.outcome} />
+        <button className="delete-btn" onClick={() => onDelete(setup.id)} title="Remove">✕</button>
+      </div>
+
+      {!editing ? (
+        <div className="setup-prices">
+          <div className="price-item"><span className="label">Entry</span><span className="value">{fmtNum(setup.entry, setup.symbol)}</span></div>
+          <div className="price-item"><span className="label">SL</span><span className="value">{fmtNum(setup.stopLoss, setup.symbol)}</span></div>
+          <div className="price-item"><span className="label">TP</span><span className="value">{fmtNum(setup.takeProfit, setup.symbol)}</span></div>
+          {!isFinal && <button className="edit-link" onClick={() => setEditing(true)}>Edit</button>}
+        </div>
+      ) : (
+        <div className="setup-edit-row">
+          <div className="field-row"><label>Entry</label><input type="number" step="any" value={entryInput} onChange={(e) => setEntryInput(e.target.value)} /></div>
+          <div className="field-row"><label>SL</label><input type="number" step="any" value={slInput} onChange={(e) => setSlInput(e.target.value)} /></div>
+          <div className="field-row"><label>TP</label><input type="number" step="any" value={tpInput} onChange={(e) => setTpInput(e.target.value)} /></div>
+          <div className="edit-actions">
+            <button className="secondary" onClick={() => setEditing(false)} disabled={saving}>Cancel</button>
+            <button className="primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </div>
+      )}
+
+      <div className="pnl-row">Risk: <span className="pnl-value negative">{riskPips.toFixed(1)} pips</span> · Reward: <span className="pnl-value positive">{rewardPips.toFixed(1)} pips</span> · R:R 1:{(rewardPips / riskPips).toFixed(1)}</div>
+      <div className="setup-reason">{setup.reason}</div>
+      <div className="setup-meta">
+        <span className="setup-time">{timeAgo(setup.createdAt)}</span>
+        {setup.manuallyEdited && <span className="setup-time">edited</span>}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [setups, setSetups] = useState([]);
+  const [settings, setSettings] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [rateLimitInfo, setRateLimitInfo] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [loading, setLoading] = useState(false);
+
+  const fetchAll = useCallback(async () => {
+    const [setupsRes, settingsRes, statusRes, statsRes, rlRes] = await Promise.all([
+      fetch(`${API_BASE}/setups`), fetch(`${API_BASE}/settings`),
+      fetch(`${API_BASE}/runner/status`), fetch(`${API_BASE}/stats`),
+      fetch(`${API_BASE}/ratelimit-info`),
+    ]);
+    setSetups(await setupsRes.json());
+    setSettings(await settingsRes.json());
+    setStatus(await statusRes.json());
+    setStats(await statsRes.json());
+    setRateLimitInfo(await rlRes.json());
+  }, []);
+
+  useEffect(() => {
+    fetchAll();
+    const interval = setInterval(fetchAll, 15000);
+    return () => clearInterval(interval);
+  }, [fetchAll]);
+
+  const handleEdit = async (id, updates) => {
+    const res = await fetch(`${API_BASE}/setups/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    setSetups(prev => prev.map(s => s.id === id ? data : s));
+  };
+
+  const handleDelete = async (id) => {
+    await fetch(`${API_BASE}/setups/${id}`, { method: 'DELETE' });
+    setSetups(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handleRunOnce = async () => {
+    setLoading(true);
+    await fetch(`${API_BASE}/runner/run-once`, { method: 'POST' });
+    await fetchAll();
+    setLoading(false);
+  };
+
+  const updateSettingsField = async (updates) => {
+    const res = await fetch(`${API_BASE}/settings`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+    const data = await res.json();
+    setSettings(data);
+    const rlRes = await fetch(`${API_BASE}/ratelimit-info`);
+    setRateLimitInfo(await rlRes.json());
+  };
+
+  const togglePair = (pair) => {
+    if (!settings) return;
+    const pairs = settings.pairs.includes(pair) ? settings.pairs.filter(p => p !== pair) : [...settings.pairs, pair];
+    updateSettingsField({ pairs });
+  };
+
+  const filteredSetups = filter === 'all' ? setups : setups.filter(s => {
+    if (filter === 'pending') return s.outcome === 'pending' || s.outcome === 'winning' || s.outcome === 'losing';
+    if (filter === 'resolved') return s.outcome === 'win' || s.outcome === 'loss';
+    return true;
+  });
+
+  return (
+    <div className="app-shell">
+      <div className="main-area">
+        <div className="header">
+          <h1>RANGER <span>Signal Bot</span></h1>
+          <div className="badge-row">
+            {status && (
+              <span className={`status-pill ${status.liveMode ? 'live' : ''}`}>
+                <span className="status-dot"></span>{status.liveMode ? 'LIVE (Twelve Data)' : 'MOCK DATA MODE'}
+              </span>
+            )}
+            {rateLimitInfo && (
+              <span className="ratelimit-badge">
+                API: {rateLimitInfo.combosPerCheck} calls/check · ~{rateLimitInfo.estimatedRequestsPerDay}/day (limit 800)
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="stats-bar">
+          <div className="stat-card"><div className="stat-label">Total</div><div className="stat-value">{stats ? stats.total : '—'}</div></div>
+          <div className="stat-card"><div className="stat-label">Pending</div><div className="stat-value">{stats ? stats.pending : '—'}</div></div>
+          <div className="stat-card accent-green"><div className="stat-label">Winning Now</div><div className="stat-value">{stats ? stats.winningNow : '—'}</div></div>
+          <div className="stat-card accent-red"><div className="stat-label">Losing Now</div><div className="stat-value">{stats ? stats.losingNow : '—'}</div></div>
+          <div className="stat-card accent-green"><div className="stat-label">Wins</div><div className="stat-value">{stats ? stats.wins : '—'}</div></div>
+          <div className="stat-card accent-red"><div className="stat-label">Losses</div><div className="stat-value">{stats ? stats.losses : '—'}</div></div>
+        </div>
+
+        <div className="toolbar">
+          <div className="filter-tabs">
+            <span className={`filter-tab ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>All</span>
+            <span className={`filter-tab ${filter === 'pending' ? 'active' : ''}`} onClick={() => setFilter('pending')}>Open</span>
+            <span className={`filter-tab ${filter === 'resolved' ? 'active' : ''}`} onClick={() => setFilter('resolved')}>Resolved</span>
+          </div>
+          <button className="secondary" onClick={fetchAll}>Refresh</button>
+          <button className="primary" onClick={handleRunOnce} disabled={loading}>{loading ? 'Scanning...' : 'Scan now'}</button>
+        </div>
+
+        <div className="setup-list">
+          {filteredSetups.length === 0 ? (
+            <div className="empty-state">No setups yet. Click "Scan now" or wait for the next automatic poll.</div>
+          ) : (
+            filteredSetups.map(s => <SetupCard key={s.id} setup={s} onEdit={handleEdit} onDelete={handleDelete} />)
+          )}
+        </div>
+      </div>
+
+      <div className="sidebar">
+        <h2>⚙️ Settings</h2>
+        {!settings ? <div>Loading...</div> : (
+          <React.Fragment>
+            <div className="settings-section">
+              <div className="toggle-row">
+                <label>Bot Enabled</label>
+                <ToggleSwitch checked={settings.enabled} onChange={(v) => updateSettingsField({ enabled: v })} />
+              </div>
+              <div className="field-row">
+                <label>Poll interval (minutes)</label>
+                <input type="number" value={settings.pollIntervalMs / 60000} onChange={(e) => updateSettingsField({ pollIntervalMs: Number(e.target.value) * 60000 })} />
+              </div>
+              {settings._intervalAutoAdjusted && (
+                <div className="auto-adjust-note">Interval was auto-adjusted to the minimum safe value for your pair count.</div>
+              )}
+            </div>
+
+            <div className="settings-section">
+              <div className="field-row"><label>Pairs ({settings.pairs.length})</label></div>
+              <div className="pair-tags">
+                {ALL_PAIRS.map(pair => (
+                  <span key={pair} className={`pair-tag ${settings.pairs.includes(pair) ? 'active' : ''}`} onClick={() => togglePair(pair)}>{pair}</span>
+                ))}
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <div className="field-row"><label>Swing detection lookback</label><input type="number" value={settings.swingLookback} onChange={(e) => updateSettingsField({ swingLookback: Number(e.target.value) })} /></div>
+              <div className="field-row"><label>FVG recency window</label><input type="number" value={settings.fvgRecencyWindow} onChange={(e) => updateSettingsField({ fvgRecencyWindow: Number(e.target.value) })} /></div>
+              <div className="field-row"><label>Sweep lookback</label><input type="number" value={settings.sweepLookback} onChange={(e) => updateSettingsField({ sweepLookback: Number(e.target.value) })} /></div>
+            </div>
+
+            <div className="settings-section">
+              <div className="toggle-row">
+                <label>Max SL pip cap</label>
+                <ToggleSwitch checked={settings.maxStopLossPipsEnabled} onChange={(v) => updateSettingsField({ maxStopLossPipsEnabled: v })} />
+              </div>
+              {settings.maxStopLossPipsEnabled && (
+                <div className="field-row"><label>Max SL (pips)</label><input type="number" value={settings.maxStopLossPips} onChange={(e) => updateSettingsField({ maxStopLossPips: Number(e.target.value) })} /></div>
+              )}
+            </div>
+
+            <div className="settings-section">
+              <div className="toggle-row">
+                <label>Telegram Alerts</label>
+                <ToggleSwitch checked={settings.telegram.enabled} onChange={(v) => fetch(`${API_BASE}/settings/telegram`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: v }) }).then(r => r.json()).then(t => setSettings(prev => ({ ...prev, telegram: t })))} />
+              </div>
+            </div>
+          </React.Fragment>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
