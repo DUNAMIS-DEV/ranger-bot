@@ -66,6 +66,7 @@ function addSetup(setup, dedupeWindowMinutes = 30) {
     ...setup,
     outcome: 'pending', // pending | winning | losing | win | loss
     outcomeTime: null,
+    lastCheckedAt: null, // tracks when the outcome tracker last checked this setup, so each poll only scans NEW candles, not the whole history again
     manuallyEdited: false,
     createdAt: new Date().toISOString(),
   };
@@ -83,6 +84,13 @@ function updateSetupOutcome(id, outcome, outcomeTime) {
   if (!setup) return null;
   setup.outcome = outcome;
   if (outcomeTime) setup.outcomeTime = outcomeTime;
+  return setup;
+}
+
+function updateSetupLastChecked(id, timestamp) {
+  const setup = setups.find((s) => s.id === id);
+  if (!setup) return null;
+  setup.lastCheckedAt = timestamp;
   return setup;
 }
 
@@ -168,9 +176,10 @@ module.exports = {
   addSetup,
   getSetups,
   updateSetupOutcome,
+  updateSetupLastChecked,
   updateSetupLevels,
   deleteSetup,
   getStats,
   clearSetups,
 };
-    
+  
