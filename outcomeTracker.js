@@ -67,12 +67,21 @@ const checkOutcome = checkFinalOutcome;
 
 /**
  * Checks every non-final setup (pending, winning, or losing — i.e. not
- * yet win/loss) against the most recent candles for its symbol/timeframe,
- * and updates status in the setup store:
- *   1. First check if TP or SL was actually touched by any candle since
- *      the setup was created -> lock in as 'win' or 'loss' if so.
- *   2. Otherwise, update the in-progress 'winning'/'losing' read based
- *      on the latest close price vs entry.
+ * yet win/loss) against candles NEWER THAN THE LAST TIME WE CHECKED —
+ * not the entire history since the setup was created. This matters:
+ * without this, every 30-minute poll would re-scan hours of old candles
+ * from scratch, meaning a stop-loss wick from hours ago could keep
+ * getting "rediscovered" on every single poll instead of being caught
+ * and locked in the very first time it happened. Tracking a per-setup
+ * `lastCheckedAt` timestamp ensures each poll only judges genuinely NEW
+ * price action that happened since the previous check — exactly matching
+ * how a real trader watching the market poll-by-poll would judge it.
+ *
+ *   1. Check candles since lastCheckedAt (or since creation, on the
+ *      very first check) for a TP/SL touch -> lock in 'win'/'loss'.
+ *   2. Otherwise, update the in-progress 'winning'/'losing' read using
+ *      the latest available close price.
+ *   3. Always advance lastCheckedAt to now, regardless of outcome.
  */
 async function updatePendingOutcomes(setupStoreRef) {
   const allSetups = setupStoreRef.getSetups({ limit: 500 });
@@ -85,12 +94,14 @@ async function updatePendingOutcomes(setupStoreRef) {
       const candles = await marketData.getCandles(setup.symbol, timeframe, 50);
       if (candles.length === 0) continue;
 
-      // Only check candles that occurred AFTER the setup was created,
-      // so we don't judge the outcome using data from before the signal.
-      // Use the setup's own entry-basis SL/TP (which may have been
-      // manually edited by the user since creation).
-      const setupTime = new Date(setup.createdAt).getTime();
-      const relevantCandles = candles.filter((c) => new Date(c.time).getTime() >= setupTime);
+      // Only check candles NEWER than the last time we checked this
+      // setup (or since creation, if this is the first check ever).
+      // This is what prevents re-scanning old, already-judged history
+      // on every poll.
+      const sinceTime = setup.lastCheckedAt
+        ? new Date(setup.lastCheckedAt).getTime()
+        : new Date(setup.createdAt).getTime();
+      const relevantCandles = candles.filter((c) => new Date(c.time).getTime() > sinceTime);
 
       let finalOutcome = null;
       let finalOutcomeTime = null;
@@ -103,8 +114,11 @@ async function updatePendingOutcomes(setupStoreRef) {
         }
       }
 
+      const now = new Date().toISOString();
+
       if (finalOutcome) {
         setupStoreRef.updateSetupOutcome(setup.id, finalOutcome, finalOutcomeTime);
+        setupStoreRef.updateSetupLastChecked(setup.id, now);
         continue;
       }
 
@@ -113,6 +127,7 @@ async function updatePendingOutcomes(setupStoreRef) {
       const latestClose = candles[candles.length - 1].close;
       const inProgressStatus = checkInProgressStatus(setup, latestClose);
       setupStoreRef.updateSetupOutcome(setup.id, inProgressStatus, null);
+      setupStoreRef.updateSetupLastChecked(setup.id, now);
     } catch (err) {
       console.error(`[OutcomeTracker] Error checking setup ${setup.id} (${setup.symbol}):`, err.message);
     }
