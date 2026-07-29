@@ -128,18 +128,22 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ---- Serve the dashboard (index.html at repo root) ----
-  if (req.method === 'GET') {
+  // Supports both GET (full page) and HEAD (headers only, no body —
+  // this is what uptime-monitoring services like UptimeRobot send by
+  // default; without this, every ping would 404 even though the server
+  // is genuinely up and fine).
+  if (req.method === 'GET' || req.method === 'HEAD') {
     let filePath = pathname === '/' ? '/index.html' : pathname;
     filePath = path.join(__dirname, filePath);
     return fs.readFile(filePath, (err, content) => {
       if (err) {
         res.writeHead(404);
-        return res.end('Not found');
+        return res.end(req.method === 'HEAD' ? undefined : 'Not found');
       }
       const ext = path.extname(filePath);
       const contentType = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript' }[ext] || 'text/plain';
-      res.writeHead(200, { 'Content-Type': contentType });
-      res.end(content);
+      res.writeHead(200, { 'Content-Type': contentType, 'Content-Length': content.length });
+      res.end(req.method === 'HEAD' ? undefined : content);
     });
   }
 
@@ -151,4 +155,4 @@ server.listen(PORT, () => {
   console.log(`Live mode: ${marketData.isLiveMode() ? 'YES (Twelve Data)' : 'NO (using mock data)'}`);
   startRunner();
 });
-                     
+        
